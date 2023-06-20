@@ -16,26 +16,41 @@ BASE_METACRITIC_URL = 'https://www.metacritic.com/game'
 
 session = requests.Session()
 
-
-def get_metacritic(game_name, platform):
+def format_name_for_url(name):
     # Format the game name for the URL
-    formatted_game_name = re.sub(r'\.+', '', game_name)
-    formatted_game_name = re.sub(r'\W+', '-', formatted_game_name).lower()
 
+    # Remove ignored characters
+    ignored_chars = set('.#/:&\',')
+    name = ''.join([c for c in name if c not in ignored_chars])
+
+    # replace spaces with dash
+    name = re.sub(r'\s+', '-', name)
+
+    # special case " - " or " -", etc.
+    name = re.sub(r'([-–]{2,})', '-', name)
+
+    name = name.lower()
+    return name
+
+def generate_url(game_name, platform):
+    formatted_game_name = format_name_for_url(game_name)
+    
     if platform == 'PS4':
         platform = 'playstation-4'
     elif platform == 'PS5':
         platform = 'playstation-5'
     else:
         raise Exception(f'Unsupported platform: {platform}')
-
+    
     # URL of the page for the specified game
     url = f'{BASE_METACRITIC_URL}/{platform}/{formatted_game_name}'
+    
+    return url
 
 
+def get_metacritic(game_name, url):
     print(f'Retrieving...')
     print(f'  Name: {game_name}')
-    print(f'  Platform: {platform}')
     print(f'  URL: {url}')
     # Send an HTTP GET request to the URL
     response = session.get(url.rstrip(), headers=HEADERS)
@@ -51,6 +66,7 @@ def get_metacritic(game_name, platform):
         'response_code': response.status_code,
         'body': response.text,
     }
+
 
 def parse(data):
     print('Parsing...')
@@ -120,14 +136,26 @@ def parse(data):
     outlets=[METACRITIC_RESULT]
 )
 def metacritic_scrape():
-    df = pd.read_pickle(f'{AIRFLOW_PATH}/datastore/wikipedia_result.pkl')
+    df_wikipedia = pd.read_pickle(f'{AIRFLOW_PATH}/datastore/wikipedia_result.pkl')
+    df_prev_metacritic = pd.read_pickle(f'{AIRFLOW_PATH}/datastore/metacritic_result.pkl')
     data_list = []
     
-    for index, row in df.iterrows():
+    for index, row in df_wikipedia.iterrows():
         game_name = row['Title']
         platform = row['Platform']
-    
-        data = get_metacritic(game_name, platform)
+        
+        # See if we've already requested this game.
+        
+        prev = df_prev_metacritic.loc[
+            (df_prev_metacritic['title'] == game_name) &
+            (df_prev_metacritic['response_code'] == 200)
+            ]
+        if len(prev) > 0:
+            url = prev['url'].iloc[0]
+        else:
+            url = generate_url(game_name, platform)
+        
+        data = get_metacritic(game_name, url)
     
         if data['response_code'] == 200:
             data = parse(data)
