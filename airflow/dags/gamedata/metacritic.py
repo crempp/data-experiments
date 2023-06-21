@@ -1,4 +1,5 @@
 from bs4 import BeautifulSoup
+import logging
 import os
 import pandas as pd
 import pathlib
@@ -8,13 +9,16 @@ import time
 from airflow import Dataset
 from airflow.decorators import task
 
+DELAY = 2  # seconds
 AIRFLOW_PATH = os.path.normpath(str(pathlib.Path(__file__).parent.resolve()) + '../../../')
-METACRITIC_RESULT = Dataset(f'file:/{AIRFLOW_PATH}/datastore/metacritic.pkl')
-
 HEADERS = {"User-Agent": 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
 BASE_METACRITIC_URL = 'https://www.metacritic.com/game'
 
+METACRITIC_RESULT = Dataset(f'file:/{AIRFLOW_PATH}/datastore/metacritic_result.pkl')
+
+logger = logging.getLogger(__name__)
 session = requests.Session()
+
 
 def format_name_for_url(name):
     # Format the game name for the URL
@@ -49,16 +53,16 @@ def generate_url(game_name, platform):
 
 
 def get_metacritic(game_name, url):
-    print(f'Retrieving...')
-    print(f'  Name: {game_name}')
-    print(f'  URL: {url}')
+    logger.info(f'Retrieving...')
+    logger.info(f'  Name: {game_name}')
+    logger.info(f'  URL: {url}')
     # Send an HTTP GET request to the URL
     response = session.get(url.rstrip(), headers=HEADERS)
 
-    print(f'Response')
-    print(f'  Code: {response.status_code}')
-    print(f'  URL: {response.url}')
-    print(f'DONE\n')
+    logger.info(f'Response')
+    logger.info(f'  Code: {response.status_code}')
+    logger.info(f'  URL: {response.url}')
+    logger.info(f'DONE\n')
 
     return {
         'title': game_name,
@@ -69,7 +73,7 @@ def get_metacritic(game_name, url):
 
 
 def parse(data):
-    print('Parsing...')
+    logger.info('Parsing...')
     soup = BeautifulSoup(data['body'], 'html.parser')
 
     data['publisher'] = soup.select('li.summary_detail.publisher span.data a')
@@ -115,19 +119,6 @@ def parse(data):
     data['image'] = soup.select('div.product_image img')
     data['image'] = data['image'][0]['src'] if len(data['image']) > 0 else None
 
-    print(f'  {data["title"]}')
-    print(f'  {data["url"]}')
-    print(f'  Metascore: {data["metascore"]} | {data["metascore_count"]} reviews')
-    print(f'  Userscore: {data["userscore"]} | {data["userscore_count"]} reviews')
-    print(f'  Publisher {data["publisher"]}')
-    print(f'  Developer {data["developer"]}')
-    print(f'  Release {data["release"]}')
-    print(f'  Players: {data["players"]}')
-    print(f'  Ratiing: {data["rating"]}')
-    print(f'  genres {data["genres"]}')
-    print(f'  {data["image"]}')
-    print(f'  \n{data["summary"]}\n\n')
-
     return data
 
 
@@ -163,7 +154,7 @@ def metacritic_scrape():
         data.pop('body')
         data_list.append(data)
     
-        time.sleep(2)
+        time.sleep(DELAY)
     
     metacritic_df = pd.DataFrame(data_list)
     metacritic_df.to_pickle(f'{AIRFLOW_PATH}/datastore/metacritic_result.pkl')

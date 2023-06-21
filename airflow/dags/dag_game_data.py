@@ -10,14 +10,14 @@ from gamedata.metacritic import metacritic_scrape
     catchup=False,
     tags=["gamedata"],
 )
-def gamedata_pipeline():
+def game_data_pipeline():
     """
     ### GameData Pipeline Documentation
     """
     wikipedia_task_group() >> metacritic_scrape()
 
 
-dag_object = gamedata_pipeline()
+dag_object = game_data_pipeline()
 
 if __name__ == "__main__":
     dag_object.test()

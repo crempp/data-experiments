@@ -9,7 +9,6 @@ import re
 from airflow import Dataset
 from airflow.decorators import task, task_group
 
-
 url_wikipedia_ps5 = 'https://en.wikipedia.org/wiki/List_of_PlayStation_5_games'
 url_wikipedia_ps4_al = 'https://en.wikipedia.org/wiki/List_of_PlayStation_4_games_(A%E2%80%93L)'
 url_wikipedia_ps4_mz = 'https://en.wikipedia.org/wiki/List_of_PlayStation_4_games_(M%E2%80%93Z)'
@@ -125,7 +124,7 @@ def parse_wikipedia_list(soup, platform):
 
 
 @task(
-    task_id="retrieve_ps4_al_page",
+    task_id="wikipedia_scrape_ps4_al_page",
     retries=2,
 )
 def retrieve_ps4_al_page():
@@ -133,7 +132,7 @@ def retrieve_ps4_al_page():
 
 
 @task(
-    task_id="retrieve_ps4_mz_page",
+    task_id="wikipedia_scrape_ps4_mz_page",
     retries=2,
 )
 def retrieve_ps4_mz_page():
@@ -141,7 +140,7 @@ def retrieve_ps4_mz_page():
 
 
 @task(
-    task_id="retrieve_ps5_page",
+    task_id="wikipedia_retrieve_ps5_page",
     retries=2,
 )
 def retrieve_ps5_page():
@@ -149,7 +148,7 @@ def retrieve_ps5_page():
 
 
 @task(
-    task_id="parse_ps4_al",
+    task_id="wikipedia_parse_ps4_al",
     outlets=[WIKIPEDIA_PS4_A],
 )
 def parse_ps4_al(page):
@@ -159,7 +158,7 @@ def parse_ps4_al(page):
 
 
 @task(
-    task_id="parse_ps4_mz",
+    task_id="wikipedia_parse_ps4_mz",
     outlets=[WIKIPEDIA_PS4_M],
 )
 def parse_ps4_mz(page):
@@ -169,7 +168,7 @@ def parse_ps4_mz(page):
 
 
 @task(
-    task_id="parse_ps5",
+    task_id="wikipedia_parse_ps5",
     outlets=[WIKIPEDIA_PS5],
 )
 def parse_ps5(page):
@@ -179,7 +178,7 @@ def parse_ps5(page):
 
 
 @task(
-    task_id="merge_results",
+    task_id="wikipedia_merge_results",
     outlets=[WIKIPEDIA_RESULT]
 )
 def merge_results():
