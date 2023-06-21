@@ -6,6 +6,7 @@ import pandas as pd
 import pathlib
 import requests
 import re
+import time
 from airflow import Dataset
 from airflow.decorators import task, task_group
 
@@ -14,10 +15,17 @@ url_wikipedia_ps4_al = 'https://en.wikipedia.org/wiki/List_of_PlayStation_4_game
 url_wikipedia_ps4_mz = 'https://en.wikipedia.org/wiki/List_of_PlayStation_4_games_(M%E2%80%93Z)'
 
 AIRFLOW_PATH = os.path.normpath(str(pathlib.Path(__file__).parent.resolve()) + '../../../')
-WIKIPEDIA_PS4_A = Dataset(f'file:/{AIRFLOW_PATH}/datastore/wikipedia_ps4_a.pkl')
-WIKIPEDIA_PS4_M = Dataset(f'file:/{AIRFLOW_PATH}/datastore/wikipedia_ps4_m.pkl')
-WIKIPEDIA_PS5 = Dataset(f'file:/{AIRFLOW_PATH}/datastore/wikipedia_ps5.pkl')
-WIKIPEDIA_RESULT = Dataset(f'file:/{AIRFLOW_PATH}/datastore/wikipedia_result.pkl')
+TIMESTAMP = time.strftime("%Y%m%d-%H%M%S")
+PATH_WIKIPEDIA_PS4_A = f'file:/{AIRFLOW_PATH}/datastore/tmp/wikipedia_ps4_a.csv'
+PATH_WIKIPEDIA_PS4_M = f'file:/{AIRFLOW_PATH}/datastore/tmp/wikipedia_ps4_m.csv'
+PATH_WIKIPEDIA_PS5 = f'file:/{AIRFLOW_PATH}/datastore/tmp/wikipedia_ps5.csv'
+PATH_WIKIPEDIA_RESULT = f'file:/{AIRFLOW_PATH}/datastore/archive/wikipedia_result_{TIMESTAMP}.csv'
+PATH_WIKIPEDIA_RESULT_CURRENT = f'file:/{AIRFLOW_PATH}/datastore/wikipedia_result_current.csv'
+DS_WIKIPEDIA_PS4_A = Dataset(PATH_WIKIPEDIA_PS4_A)
+DS_WIKIPEDIA_PS4_M = Dataset(PATH_WIKIPEDIA_PS4_M)
+DS_WIKIPEDIA_PS5 = Dataset(PATH_WIKIPEDIA_PS5)
+DS_WIKIPEDIA_RESULT = Dataset(PATH_WIKIPEDIA_RESULT)
+DS_WIKIPEDIA_RESULT_CURRENT = Dataset(PATH_WIKIPEDIA_RESULT_CURRENT)
 
 
 def get_page(url):
@@ -149,50 +157,51 @@ def retrieve_ps5_page():
 
 @task(
     task_id="wikipedia_parse_ps4_al",
-    outlets=[WIKIPEDIA_PS4_A],
+    outlets=[DS_WIKIPEDIA_PS4_A],
 )
 def parse_ps4_al(page):
     bs_page = BeautifulSoup(page, 'html.parser')
     df = parse_wikipedia_list(bs_page, 'PS4')
-    df.to_pickle(f'{AIRFLOW_PATH}/datastore/wikipedia_ps4_a.pkl')
+    df.to_csv(PATH_WIKIPEDIA_PS4_A, index=True)
 
 
 @task(
     task_id="wikipedia_parse_ps4_mz",
-    outlets=[WIKIPEDIA_PS4_M],
+    outlets=[DS_WIKIPEDIA_PS4_M],
 )
 def parse_ps4_mz(page):
     bs_page = BeautifulSoup(page, 'html.parser')
     df = parse_wikipedia_list(bs_page, 'PS4')
-    df.to_pickle(f'{AIRFLOW_PATH}/datastore/wikipedia_ps4_m.pkl')
+    df.to_csv(PATH_WIKIPEDIA_PS4_M, index=True)
 
 
 @task(
     task_id="wikipedia_parse_ps5",
-    outlets=[WIKIPEDIA_PS5],
+    outlets=[DS_WIKIPEDIA_PS5],
 )
 def parse_ps5(page):
     bs_page = BeautifulSoup(page, 'html.parser')
     df = parse_wikipedia_list(bs_page, 'PS5')
-    df.to_pickle(f'{AIRFLOW_PATH}/datastore/wikipedia_ps5.pkl')
+    df.to_csv(PATH_WIKIPEDIA_PS5, index=True)
 
 
 @task(
     task_id="wikipedia_merge_results",
-    outlets=[WIKIPEDIA_RESULT]
+    outlets=[DS_WIKIPEDIA_RESULT, DS_WIKIPEDIA_RESULT_CURRENT]
 )
 def merge_results():
     # Load datasets
-    a = pd.read_pickle(f'{AIRFLOW_PATH}/datastore/wikipedia_ps4_a.pkl')
-    b = pd.read_pickle(f'{AIRFLOW_PATH}/datastore/wikipedia_ps4_m.pkl')
-    c = pd.read_pickle(f'{AIRFLOW_PATH}/datastore/wikipedia_ps5.pkl')
+    a = pd.read_csv(PATH_WIKIPEDIA_PS4_A)
+    b = pd.read_csv(PATH_WIKIPEDIA_PS4_M)
+    c = pd.read_csv(PATH_WIKIPEDIA_PS5)
     
     # Merge lists
     df = a.merge(b, how='outer')
     df = df.merge(c, how='outer')
     df = df.sort_values(by=['Title'])
-    df.to_pickle(f'{AIRFLOW_PATH}/datastore/wikipedia_result.pkl')
-    
+    df.to_csv(PATH_WIKIPEDIA_RESULT, index=True)
+    df.to_csv(PATH_WIKIPEDIA_RESULT_CURRENT, index=True)
+
 
 # Creating TaskGroups
 @task_group(

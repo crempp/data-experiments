@@ -39,14 +39,17 @@ HEADERS = [
 ]
 
 AIRFLOW_PATH = os.path.normpath(str(pathlib.Path(__file__).parent.resolve()) + '../../../')
-
-PS_DIRECT_PHYSICAL_RESULT = Dataset(f'file:/{AIRFLOW_PATH}/datastore/ps_direct_physical_result.pkl')
+TIMESTAMP = time.strftime("%Y%m%d-%H%M%S")
+PATH_PS_DIRECT_PHYSICAL_RESULT = f'file:/{AIRFLOW_PATH}/datastore/archive/ps_direct_physical_result_{TIMESTAMP}.csv'
+PATH_PS_DIRECT_PHYSICAL_RESULT_CURRENT = f'file:/{AIRFLOW_PATH}/datastore/ps_direct_physical_result_current.csv'
+DS_PS_DIRECT_PHYSICAL_RESULT = Dataset(PATH_PS_DIRECT_PHYSICAL_RESULT)
+DS_PS_DIRECT_PHYSICAL_RESULT_CURRENT = Dataset(PATH_PS_DIRECT_PHYSICAL_RESULT_CURRENT)
 
 session = requests.Session()
 @task(
     task_id="ps_direct_physical_scrape",
     retries=2,
-    outlets=[PS_DIRECT_PHYSICAL_RESULT]
+    outlets=[DS_PS_DIRECT_PHYSICAL_RESULT, DS_PS_DIRECT_PHYSICAL_RESULT_CURRENT]
 )
 def ps_direct_physical_scrape():
     current_page = 0
@@ -85,4 +88,5 @@ def ps_direct_physical_scrape():
         
         time.sleep(DELAY)
     
-    df.to_pickle(f'{AIRFLOW_PATH}/datastore/ps_direct_physical_result.pkl')
+    df.to_csv(PATH_PS_DIRECT_PHYSICAL_RESULT, index=True)
+    df.to_csv(PATH_PS_DIRECT_PHYSICAL_RESULT_CURRENT, index=True)

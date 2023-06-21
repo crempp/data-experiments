@@ -10,11 +10,16 @@ from airflow import Dataset
 from airflow.decorators import task
 
 DELAY = 2  # seconds
-AIRFLOW_PATH = os.path.normpath(str(pathlib.Path(__file__).parent.resolve()) + '../../../')
+
 HEADERS = {"User-Agent": 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
 BASE_METACRITIC_URL = 'https://www.metacritic.com/game'
 
-METACRITIC_RESULT = Dataset(f'file:/{AIRFLOW_PATH}/datastore/metacritic_result.pkl')
+AIRFLOW_PATH = os.path.normpath(str(pathlib.Path(__file__).parent.resolve()) + '../../../')
+TIMESTAMP = time.strftime("%Y%m%d-%H%M%S")
+PATH_METACRITIC_RESULT = f'file:/{AIRFLOW_PATH}/datastore/archive/metacritic_result_{TIMESTAMP}.csv'
+PATH_METACRITIC_RESULT_CURRENT = f'file:/{AIRFLOW_PATH}/datastore/metacritic_result_current.csv'
+DS_METACRITIC_RESULT = Dataset(PATH_METACRITIC_RESULT)
+DS_METACRITIC_RESULT_CURRENT = Dataset(PATH_METACRITIC_RESULT_CURRENT)
 
 logger = logging.getLogger(__name__)
 session = requests.Session()
@@ -124,11 +129,11 @@ def parse(data):
 
 @task(
     task_id="metacritic_scrape",
-    outlets=[METACRITIC_RESULT]
+    outlets=[DS_METACRITIC_RESULT, DS_METACRITIC_RESULT_CURRENT]
 )
 def metacritic_scrape():
-    df_wikipedia = pd.read_pickle(f'{AIRFLOW_PATH}/datastore/wikipedia_result.pkl')
-    df_prev_metacritic = pd.read_pickle(f'{AIRFLOW_PATH}/datastore/metacritic_result.pkl')
+    df_wikipedia = pd.read_csv(f'file:/{AIRFLOW_PATH}/datastore/wikipedia_result_current.csv')
+    df_prev_metacritic = pd.read_csv(PATH_METACRITIC_RESULT_CURRENT)
     data_list = []
     
     for index, row in df_wikipedia.iterrows():
@@ -157,4 +162,5 @@ def metacritic_scrape():
         time.sleep(DELAY)
     
     metacritic_df = pd.DataFrame(data_list)
-    metacritic_df.to_pickle(f'{AIRFLOW_PATH}/datastore/metacritic_result.pkl')
+    metacritic_df.to_csv(PATH_METACRITIC_RESULT, index=True)
+    metacritic_df.to_csv(PATH_METACRITIC_RESULT_CURRENT, index=True)
