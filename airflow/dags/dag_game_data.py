@@ -14,8 +14,7 @@ def game_data_pipeline():
     """
     ### GameData Pipeline Documentation
     """
-    wikipedia_task_group()
-    #>> metacritic_scrape()
+    wikipedia_task_group() >> metacritic_scrape()
 
 
 dag_object = game_data_pipeline()

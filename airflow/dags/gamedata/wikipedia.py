@@ -1,12 +1,9 @@
 from bs4 import BeautifulSoup
 from dateutil.parser import parse, ParserError
 import hashlib
-import os
 import pandas as pd
-import pathlib
 import requests
 import re
-import time
 from airflow import Dataset
 from airflow.decorators import task, task_group
 from gamedata.helpers import get_s3_file, put_s3_file

@@ -1,5 +1,5 @@
 from io import BytesIO
-from minio import Minio
+from minio import Minio, S3Error
 import pandas as pd
 
 
@@ -30,6 +30,26 @@ def put_s3_file(df, path):
         content_type='application/csv'
     )
 
+
+def s3_get_nth_prev_object(path, n):
+    """For versioned objects this gets the n'th previous version
+
+    n=0 means the current version, n=1 is the previous version, etc...
+    """
+    obj_list = client.list_objects('datalake', include_version=True, recursive=True)
+    obj_list = filter(lambda o: (o.last_modified != None) & (o.object_name == path), obj_list)
+    # Sort by modified date, oldest first
+    obj_list = sorted(obj_list, key=lambda o: o.last_modified, reverse=True)
+    return obj_list[n]
+
+
+def s3_path_exists(path):
+    try:
+        client.stat_object("datalake", path)
+    except S3Error:
+        return False
+    else:
+        return True
 
 def generate_genre_map(df):
     """Create a base mapping to a standardized genre name from the mess that Wikipedia has.

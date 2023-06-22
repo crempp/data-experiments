@@ -1,25 +1,21 @@
 from bs4 import BeautifulSoup
 import logging
-import os
 import pandas as pd
-import pathlib
 import requests
 import re
 import time
 from airflow import Dataset
 from airflow.decorators import task
+from gamedata.helpers import get_s3_file, put_s3_file, s3_path_exists
 
 DELAY = 2  # seconds
 
 HEADERS = {"User-Agent": 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
 BASE_METACRITIC_URL = 'https://www.metacritic.com/game'
 
-AIRFLOW_PATH = os.path.normpath(str(pathlib.Path(__file__).parent.resolve()) + '../../../')
-TIMESTAMP = time.strftime("%Y%m%d-%H%M%S")
-PATH_METACRITIC_RESULT = f'file:/{AIRFLOW_PATH}/datastore/archive/metacritic_result_{TIMESTAMP}.csv'
-PATH_METACRITIC_RESULT_CURRENT = f'file:/{AIRFLOW_PATH}/datastore/metacritic_result_current.csv'
+PATH_WIKIPEDIA_RESULT = f'wikipedia_result.csv'
+PATH_METACRITIC_RESULT = f'metacritic_result.csv'
 DS_METACRITIC_RESULT = Dataset(PATH_METACRITIC_RESULT)
-DS_METACRITIC_RESULT_CURRENT = Dataset(PATH_METACRITIC_RESULT_CURRENT)
 
 logger = logging.getLogger(__name__)
 session = requests.Session()
@@ -129,11 +125,14 @@ def parse(data):
 
 @task(
     task_id="metacritic_scrape",
-    outlets=[DS_METACRITIC_RESULT, DS_METACRITIC_RESULT_CURRENT]
+    outlets=[DS_METACRITIC_RESULT]
 )
 def metacritic_scrape():
-    df_wikipedia = pd.read_csv(f'file:/{AIRFLOW_PATH}/datastore/wikipedia_result_current.csv')
-    df_prev_metacritic = pd.read_csv(PATH_METACRITIC_RESULT_CURRENT)
+    df_wikipedia = get_s3_file(PATH_WIKIPEDIA_RESULT)
+    if (s3_path_exists(PATH_METACRITIC_RESULT)):
+        df_prev_metacritic = get_s3_file(PATH_METACRITIC_RESULT)
+    else:
+        df_prev_metacritic = None
     data_list = []
     
     for index, row in df_wikipedia.iterrows():
@@ -141,15 +140,17 @@ def metacritic_scrape():
         platform = row['Platform']
         
         # See if we've already requested this game.
-        
-        prev = df_prev_metacritic.loc[
-            (df_prev_metacritic['title'] == game_name) &
-            (df_prev_metacritic['response_code'] == 200)
-            ]
-        if len(prev) > 0:
-            url = prev['url'].iloc[0]
-        else:
+        if df_prev_metacritic == None:
             url = generate_url(game_name, platform)
+        else:
+            prev = df_prev_metacritic.loc[
+                (df_prev_metacritic['title'] == game_name) &
+                (df_prev_metacritic['response_code'] == 200)
+            ]
+            if len(prev) > 0:
+                url = prev['url'].iloc[0]
+            else:
+                url = generate_url(game_name, platform)
         
         data = get_metacritic(game_name, url)
     
@@ -162,5 +163,4 @@ def metacritic_scrape():
         time.sleep(DELAY)
     
     metacritic_df = pd.DataFrame(data_list)
-    metacritic_df.to_csv(PATH_METACRITIC_RESULT, index=True)
-    metacritic_df.to_csv(PATH_METACRITIC_RESULT_CURRENT, index=True)
+    put_s3_file(metacritic_df, PATH_METACRITIC_RESULT)
