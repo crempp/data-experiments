@@ -15,7 +15,7 @@ BASE_METACRITIC_URL = 'https://www.metacritic.com/game'
 
 PATH_WIKIPEDIA_RESULT = f'wikipedia_result.csv'
 PATH_METACRITIC_RESULT = f'metacritic_result.csv'
-DS_METACRITIC_RESULT = Dataset(PATH_METACRITIC_RESULT)
+DS_METACRITIC_RESULT = Dataset(f'lorenz://datalake/{PATH_METACRITIC_RESULT}')
 
 logger = logging.getLogger(__name__)
 session = requests.Session()

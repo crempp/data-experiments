@@ -1,11 +1,10 @@
 import json
-import os
 import pandas as pd
-import pathlib
 import requests
 import time
 from airflow import Dataset
 from airflow.decorators import task
+from gamedata.helpers import get_s3_file, put_s3_file, s3_path_exists
 
 DELAY = 1  # second
 
@@ -38,18 +37,14 @@ HEADERS = [
     'merchandisingBadge'
 ]
 
-AIRFLOW_PATH = os.path.normpath(str(pathlib.Path(__file__).parent.resolve()) + '../../../')
-TIMESTAMP = time.strftime("%Y%m%d-%H%M%S")
-PATH_PS_DIRECT_PHYSICAL_RESULT = f'file:/{AIRFLOW_PATH}/datastore/archive/ps_direct_physical_result_{TIMESTAMP}.csv'
-PATH_PS_DIRECT_PHYSICAL_RESULT_CURRENT = f'file:/{AIRFLOW_PATH}/datastore/ps_direct_physical_result_current.csv'
-DS_PS_DIRECT_PHYSICAL_RESULT = Dataset(PATH_PS_DIRECT_PHYSICAL_RESULT)
-DS_PS_DIRECT_PHYSICAL_RESULT_CURRENT = Dataset(PATH_PS_DIRECT_PHYSICAL_RESULT_CURRENT)
+PATH_PS_DIRECT_PHYSICAL_RESULT = f'ps_direct_physical_result_current.csv'
+DS_PS_DIRECT_PHYSICAL_RESULT = Dataset(f'lorenz://datalake/{PATH_PS_DIRECT_PHYSICAL_RESULT}')
 
 session = requests.Session()
 @task(
     task_id="ps_direct_physical_scrape",
     retries=2,
-    outlets=[DS_PS_DIRECT_PHYSICAL_RESULT, DS_PS_DIRECT_PHYSICAL_RESULT_CURRENT]
+    outlets=[DS_PS_DIRECT_PHYSICAL_RESULT]
 )
 def ps_direct_physical_scrape():
     current_page = 0
@@ -88,5 +83,4 @@ def ps_direct_physical_scrape():
         
         time.sleep(DELAY)
     
-    df.to_csv(PATH_PS_DIRECT_PHYSICAL_RESULT, index=True)
-    df.to_csv(PATH_PS_DIRECT_PHYSICAL_RESULT_CURRENT, index=True)
+    put_s3_file(df, PATH_PS_DIRECT_PHYSICAL_RESULT)

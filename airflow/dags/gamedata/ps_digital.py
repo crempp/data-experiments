@@ -1,15 +1,13 @@
 from bs4 import BeautifulSoup
 import json
 import logging
-import os
 import pandas as pd
-import pathlib
 import re
 import requests
 import time
 from airflow import Dataset
 from airflow.decorators import task
-
+from gamedata.helpers import get_s3_file, put_s3_file, s3_path_exists
 
 DELAY = 1  # seconds
 BASE_URL = 'https://store.playstation.com'
@@ -17,12 +15,8 @@ LIST_BASE_URL = f'{BASE_URL}/en-us/pages/browse'
 API_HASH = '16b0b76dac848b6e33ed088a5a3aedb738e51c9481c6a6eb6d6c1c1991ea1f39'
 headers={"X-Psn-Store-Locale-Override":"en-US"}
 
-AIRFLOW_PATH = os.path.normpath(str(pathlib.Path(__file__).parent.resolve()) + '../../../')
-TIMESTAMP = time.strftime("%Y%m%d-%H%M%S")
-PATH_PS_DIGITAL_RESULT = f'file:/{AIRFLOW_PATH}/datastore/archive/ps_digital_result_{TIMESTAMP}.csv'
-PATH_PS_DIGITAL_RESULT_CURRENT = f'file:/{AIRFLOW_PATH}/datastore/ps_digital_result_current.csv'
-DS_PS_DIGITAL_RESULT = Dataset(PATH_PS_DIGITAL_RESULT)
-DS_PS_DIGITAL_RESULT_CURRENT = Dataset(PATH_PS_DIGITAL_RESULT_CURRENT)
+PATH_PS_DIGITAL_RESULT = f'ps_digital_result_current.csv'
+DS_PS_DIGITAL_RESULT = Dataset(f'lorenz://datalake/{PATH_PS_DIGITAL_RESULT}')
 
 session = requests.Session()
 logger = logging.getLogger(__name__)
@@ -118,17 +112,18 @@ def scrape_game_api(data):
 @task(
     task_id="ps_digital_scrape",
     retries=2,
-    outlets=[DS_PS_DIGITAL_RESULT, DS_PS_DIGITAL_RESULT_CURRENT]
+    outlets=[DS_PS_DIGITAL_RESULT]
 )
 def ps_digital_scrape():
     page = 1
-
     game_list = []
 
     # Loop through pages
     while True:
         # Retrieve list page
-        response = session.get(f'{LIST_BASE_URL}/{page}')
+        url = f'{LIST_BASE_URL}/{page}'
+        print(url)
+        response = session.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
 
         # There is no clear way to know when we've arrived at the end.
@@ -166,5 +161,4 @@ def ps_digital_scrape():
         page = page + 1
     
     df = pd.DataFrame(game_list)
-    df.to_csv(PATH_PS_DIGITAL_RESULT, index=True)
-    df.to_csv(PATH_PS_DIGITAL_RESULT_CURRENT, index=True)
+    put_s3_file(df, PATH_PS_DIGITAL_RESULT)
