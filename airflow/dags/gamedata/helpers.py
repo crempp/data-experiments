@@ -1,3 +1,36 @@
+from io import BytesIO
+from minio import Minio
+import pandas as pd
+
+
+client = Minio(
+    "lorenz:9000",
+    access_key="airflowuser",
+    secret_key="6Q6Gat93BArEg3oAd4NLhFjqhynM",
+    secure=False
+)
+
+
+def get_s3_file(path):
+    obj = client.get_object(
+        "datalake",
+        path,
+    )
+    df = pd.read_csv(obj)
+    return df
+
+
+def put_s3_file(df, path):
+    csv = df.to_csv().encode('utf-8')
+    client.put_object(
+        "datalake",
+        path,
+        data=BytesIO(csv),
+        length=len(csv),
+        content_type='application/csv'
+    )
+
+
 def generate_genre_map(df):
     """Create a base mapping to a standardized genre name from the mess that Wikipedia has.
 

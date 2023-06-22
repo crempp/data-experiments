@@ -9,23 +9,22 @@ import re
 import time
 from airflow import Dataset
 from airflow.decorators import task, task_group
+from gamedata.helpers import get_s3_file, put_s3_file
 
 url_wikipedia_ps5 = 'https://en.wikipedia.org/wiki/List_of_PlayStation_5_games'
 url_wikipedia_ps4_al = 'https://en.wikipedia.org/wiki/List_of_PlayStation_4_games_(A%E2%80%93L)'
 url_wikipedia_ps4_mz = 'https://en.wikipedia.org/wiki/List_of_PlayStation_4_games_(M%E2%80%93Z)'
 
-AIRFLOW_PATH = os.path.normpath(str(pathlib.Path(__file__).parent.resolve()) + '../../../')
-TIMESTAMP = time.strftime("%Y%m%d-%H%M%S")
-PATH_WIKIPEDIA_PS4_A = f'file:/{AIRFLOW_PATH}/datastore/tmp/wikipedia_ps4_a.csv'
-PATH_WIKIPEDIA_PS4_M = f'file:/{AIRFLOW_PATH}/datastore/tmp/wikipedia_ps4_m.csv'
-PATH_WIKIPEDIA_PS5 = f'file:/{AIRFLOW_PATH}/datastore/tmp/wikipedia_ps5.csv'
-PATH_WIKIPEDIA_RESULT = f'file:/{AIRFLOW_PATH}/datastore/archive/wikipedia_result_{TIMESTAMP}.csv'
-PATH_WIKIPEDIA_RESULT_CURRENT = f'file:/{AIRFLOW_PATH}/datastore/wikipedia_result_current.csv'
-DS_WIKIPEDIA_PS4_A = Dataset(PATH_WIKIPEDIA_PS4_A)
-DS_WIKIPEDIA_PS4_M = Dataset(PATH_WIKIPEDIA_PS4_M)
-DS_WIKIPEDIA_PS5 = Dataset(PATH_WIKIPEDIA_PS5)
-DS_WIKIPEDIA_RESULT = Dataset(PATH_WIKIPEDIA_RESULT)
-DS_WIKIPEDIA_RESULT_CURRENT = Dataset(PATH_WIKIPEDIA_RESULT_CURRENT)
+PATH_WIKIPEDIA_PS4_A = f'tmp/wikipedia_ps4_a.csv'
+PATH_WIKIPEDIA_PS4_M = f'tmp/wikipedia_ps4_m.csv'
+PATH_WIKIPEDIA_PS5 = f'tmp/wikipedia_ps5.csv'
+PATH_WIKIPEDIA_RESULT = f'wikipedia_result.csv'
+DS_WIKIPEDIA_PS4_A = Dataset(f'lorenz://datalake/{PATH_WIKIPEDIA_PS4_A}')
+DS_WIKIPEDIA_PS4_M = Dataset(f'lorenz://datalake/{PATH_WIKIPEDIA_PS4_M}')
+DS_WIKIPEDIA_PS5 = Dataset(f'lorenz://datalake/{PATH_WIKIPEDIA_PS5}')
+DS_WIKIPEDIA_RESULT = Dataset(f'lorenz://datalake/{PATH_WIKIPEDIA_RESULT}')
+
+
 
 
 def get_page(url):
@@ -58,6 +57,7 @@ def parse_date(v):
     except ParserError:
         return None
 
+
 def parse_wikipedia_list(soup, platform):
     # Get the table of games
     table = soup.find('table', id='softwarelist')
@@ -88,45 +88,29 @@ def parse_wikipedia_list(soup, platform):
     df['Genre'] = df_0['Genre'].map(extract_list).to_list()  # TODO: Normalize genres
     df['Developer'] = df_0['Developer'].map(lambda a: a.text.strip())
     df['Publisher'] = df_0['Publisher'].map(lambda a: a.text.strip())
-    df['Unreleased JP'] = df_0['Release Date JP'].map(
-        lambda a: a.text.strip() == 'Unreleased')
-    df['Unreleased NA'] = df_0['Release Date NA'].map(
-        lambda a: a.text.strip() == 'Unreleased')
-    df['Unreleased PAL'] = df_0['Release Date PAL'].map(
-        lambda a: a.text.strip() == 'Unreleased')
-    df['TBA JP'] = df_0['Release Date JP'].map(
-        lambda a: a.text.strip() == 'TBA')
-    df['TBA NA'] = df_0['Release Date NA'].map(
-        lambda a: a.text.strip() == 'TBA')
-    df['TBA PAL'] = df_0['Release Date PAL'].map(
-        lambda a: a.text.strip() == 'TBA')
+    df['Unreleased JP'] = df_0['Release Date JP'].map(lambda a: a.text.strip() == 'Unreleased')
+    df['Unreleased NA'] = df_0['Release Date NA'].map(lambda a: a.text.strip() == 'Unreleased')
+    df['Unreleased PAL'] = df_0['Release Date PAL'].map(lambda a: a.text.strip() == 'Unreleased')
+    df['TBA JP'] = df_0['Release Date JP'].map(lambda a: a.text.strip() == 'TBA')
+    df['TBA NA'] = df_0['Release Date NA'].map(lambda a: a.text.strip() == 'TBA')
+    df['TBA PAL'] = df_0['Release Date PAL'].map(lambda a: a.text.strip() == 'TBA')
     df['Release Date JP'] = df_0['Release Date JP'].map(parse_date)
     df['Release Date NA'] = df_0['Release Date NA'].map(parse_date)
     df['Release Date PAL'] = df_0['Release Date PAL'].map(parse_date)
-    df['Crossbuy'] = df_0['Addons'].map(
-        lambda a: False if a is None else 'CB' in a.text)
-    df['Crossplay'] = df_0['Addons'].map(
-        lambda a: False if a is None else 'CP' in a.text)
-    df['3DTV'] = df_0['Addons'].map(
-        lambda a: False if a is None else '3D' in a.text)
-    df['PS Camera'] = df_0['Addons'].map(
-        lambda a: False if a is None else 'C' in a.text)
-    df['PS4 Pro Enhanced'] = df_0['Addons'].map(
-        lambda a: False if a is None else 'P' in a.text)
-    df['Play Link'] = df_0['Addons'].map(
-        lambda a: False if a is None else 'PL' in a.text)
-    df['PSVR'] = df_0['Addons'].map(
-        lambda a: False if a is None else 'VR' in a.text)
-    df['PSVR2'] = df_0['Addons'].map(
-        lambda a: False if a is None else 'VR2' in a.text)
+    df['Crossbuy'] = df_0['Addons'].map(lambda a: False if a is None else 'CB' in a.text)
+    df['Crossplay'] = df_0['Addons'].map(lambda a: False if a is None else 'CP' in a.text)
+    df['3DTV'] = df_0['Addons'].map(lambda a: False if a is None else '3D' in a.text)
+    df['PS Camera'] = df_0['Addons'].map(lambda a: False if a is None else 'C' in a.text)
+    df['PS4 Pro Enhanced'] = df_0['Addons'].map(lambda a: False if a is None else 'P' in a.text)
+    df['Play Link'] = df_0['Addons'].map(lambda a: False if a is None else 'PL' in a.text)
+    df['PSVR'] = df_0['Addons'].map(lambda a: False if a is None else 'VR' in a.text)
+    df['PSVR2'] = df_0['Addons'].map(lambda a: False if a is None else 'VR2' in a.text)
     df['Platform'] = platform
     
     # Create a hash to uniquely identify the entry
-    df['Hash'] = (df['Title'] + df['Developer'] + df['Publisher'] + df[
-        'Platform'])
+    df['Hash'] = (df['Title'] + df['Developer'] + df['Publisher'] + df['Platform'])
     df['Hash'] = df['Hash'].map(lambda a: re.sub(r'\W+', '', a).lower())
-    df['Hash'] = df['Hash'].map(
-        lambda a: hashlib.sha256(a.encode('utf-8')).hexdigest())
+    df['Hash'] = df['Hash'].map(lambda a: hashlib.sha256(a.encode('utf-8')).hexdigest())
     
     return df
 
@@ -162,8 +146,8 @@ def retrieve_ps5_page():
 def parse_ps4_al(page):
     bs_page = BeautifulSoup(page, 'html.parser')
     df = parse_wikipedia_list(bs_page, 'PS4')
-    df.to_csv(PATH_WIKIPEDIA_PS4_A, index=True)
-
+    # df.to_csv(PATH_WIKIPEDIA_PS4_A, index=True)
+    put_s3_file(df, PATH_WIKIPEDIA_PS4_A)
 
 @task(
     task_id="wikipedia_parse_ps4_mz",
@@ -172,8 +156,8 @@ def parse_ps4_al(page):
 def parse_ps4_mz(page):
     bs_page = BeautifulSoup(page, 'html.parser')
     df = parse_wikipedia_list(bs_page, 'PS4')
-    df.to_csv(PATH_WIKIPEDIA_PS4_M, index=True)
-
+    # df.to_csv(PATH_WIKIPEDIA_PS4_M, index=True)
+    put_s3_file(df, PATH_WIKIPEDIA_PS4_M)
 
 @task(
     task_id="wikipedia_parse_ps5",
@@ -182,25 +166,25 @@ def parse_ps4_mz(page):
 def parse_ps5(page):
     bs_page = BeautifulSoup(page, 'html.parser')
     df = parse_wikipedia_list(bs_page, 'PS5')
-    df.to_csv(PATH_WIKIPEDIA_PS5, index=True)
+    # df.to_csv(PATH_WIKIPEDIA_PS5, index=True)
+    put_s3_file(df, PATH_WIKIPEDIA_PS5)
 
 
 @task(
     task_id="wikipedia_merge_results",
-    outlets=[DS_WIKIPEDIA_RESULT, DS_WIKIPEDIA_RESULT_CURRENT]
+    outlets=[DS_WIKIPEDIA_RESULT]
 )
 def merge_results():
     # Load datasets
-    a = pd.read_csv(PATH_WIKIPEDIA_PS4_A)
-    b = pd.read_csv(PATH_WIKIPEDIA_PS4_M)
-    c = pd.read_csv(PATH_WIKIPEDIA_PS5)
+    a = get_s3_file(PATH_WIKIPEDIA_PS4_A)
+    b = get_s3_file(PATH_WIKIPEDIA_PS4_M)
+    c = get_s3_file(PATH_WIKIPEDIA_PS5)
     
     # Merge lists
     df = a.merge(b, how='outer')
     df = df.merge(c, how='outer')
     df = df.sort_values(by=['Title'])
-    df.to_csv(PATH_WIKIPEDIA_RESULT, index=True)
-    df.to_csv(PATH_WIKIPEDIA_RESULT_CURRENT, index=True)
+    put_s3_file(df, PATH_WIKIPEDIA_RESULT)
 
 
 # Creating TaskGroups
