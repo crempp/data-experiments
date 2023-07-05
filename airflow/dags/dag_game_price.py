@@ -15,7 +15,10 @@ def game_price_pipeline():
     ### Game Price Pipeline Documentation
     """
     ps_direct_physical_scrape()
-    ps_digital_scrape()
+    
+    # Do not run digital scrape at the moment.
+    # store.playstation.com bans hard
+    #ps_digital_scrape()
 
 
 dag_object = game_price_pipeline()

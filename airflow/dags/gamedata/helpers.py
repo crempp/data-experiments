@@ -11,12 +11,12 @@ client = Minio(
 )
 
 
-def get_s3_file(path):
+def get_s3_file(path, lineterminator=None):
     obj = client.get_object(
         "datalake",
         path,
     )
-    df = pd.read_csv(obj)
+    df = pd.read_csv(obj, lineterminator=lineterminator)
     return df
 
 
@@ -51,18 +51,28 @@ def s3_path_exists(path):
     else:
         return True
 
+def csv_string_to_list(series):
+    series = series.map(lambda x: x.strip('(\',) '))
+    series = series.map(lambda x: x.split(','))
+    series = series.map(lambda x: list(map(lambda y: y.strip('\'" '), x)))
+    return series
+
+
 def generate_genre_map(df):
     """Create a base mapping to a standardized genre name from the mess that Wikipedia has.
 
     This function takes a DataFrame (df) from the Wikipedia job.
     """
-    # Explode tuples
-    genres_full = df['Genre'].explode('Genre')
-    # Split any remaining comma seperated lists
-    genres_full = genres_full.str.split(',', expand=True)
-    genres_full = genres_full[0].to_frame(name="Genre").merge(genres_full[1].to_frame(name="Genre"), how='outer', on='Genre')
-    genres_full = genres_full['Genre']
+    genres_full = df['Genre']
+
+    # Parse genres back into a list
+    genres_full = csv_string_to_list(genres_full)
+
+    # Remove null values
     genres_full = genres_full[genres_full.notnull()]
+
+    # Explode lists into rows
+    genres_full = genres_full.explode('Genre')
 
     # Create the mapping dataframe
     genre_map = pd.DataFrame({
@@ -73,9 +83,12 @@ def generate_genre_map(df):
     # Capitalize words
     genre_map['to'] = genre_map['to'].map(lambda a: a.title())
 
+    # Trim spaces
+    genre_map['to'] = genre_map['to'].map(lambda a: a.strip())
+
     # Reduce to unique entries
     genre_map = genre_map.drop_duplicates(subset=['from'])
 
-    genre_map = genre_map.sort_values('from')
+    genre_map = genre_map.sort_values('to')
 
     return genre_map

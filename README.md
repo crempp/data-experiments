@@ -11,4 +11,7 @@ TODO
 * Choose a way to update master list
 * Move data to BigQuery/S3
 * Keep historical data
+* Use HEAD to check for changes
+* break wikipedia into it's own dag and split
+* break metacritic into it's own dag and split
 * 
