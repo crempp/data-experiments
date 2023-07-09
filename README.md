@@ -14,4 +14,22 @@ TODO
 * Use HEAD to check for changes
 * break wikipedia into it's own dag and split
 * break metacritic into it's own dag and split
-* 
+
+## Data
+* √ Wikipedia
+* √ Metacritic
+* How long to beat
+
+## Prices
+
+* Amazon
+* Walmart
+* Bestbuy
+* Gamestop
+* Target
+* https://videogamesplus.ca/
+* https://www.iam8bit.com/
+* https://www.play-asia.com/
+* Gamefly?
+* Woot?
+* ebay?

@@ -162,7 +162,7 @@ def metacritic_scrape():
         if data['Response Code'] == 200:
             data = parse(data)
             # Create a hash to uniquely identify the entry
-            data['Hash'] = data['Title'] + data['Developer'] + data['Publisher'] +data['Platform']
+            data['Hash'] = f"{data['Title']}{data['Developer']}{data['Publisher']}{data['Platform']}"
             data['Hash'] = re.sub(r'\W+', '', data['Hash']).lower()
             data['Hash'] = hashlib.sha256(data['Hash'].encode('utf-8')).hexdigest()
         else:

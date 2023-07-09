@@ -1,3 +1,6 @@
 .aws
 datastore
 logs
+psgamedata-key.json
+client_secret_oauth.json
+authorized_user.json
